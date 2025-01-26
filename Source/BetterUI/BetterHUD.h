@@ -14,9 +14,6 @@ public:
 	ABetterHUD();
 	virtual void BeginPlay() override;
 	virtual void ShowHUD() override;
-	
-	UFUNCTION(BlueprintCallable)
-	void TogglePlayerUI(bool bShow);
 
 	UFUNCTION(BlueprintCallable)
 	class UBetterContainerWidget* GetMenusWidget() const { return IsValid(MenusContainerWidget) ? MenusContainerWidget : nullptr; }
@@ -28,10 +25,10 @@ public:
 	FKey GetGamepadBackInput() const { return GamepadBackInput; }
 
 	UFUNCTION(BlueprintCallable)
-	void AddMenu(TSubclassOf<class UCommonActivatableWidget> CommonWidget);
+	virtual UCommonActivatableWidget* AddWidget(TSubclassOf<class UCommonActivatableWidget> InCommonWidget, UBetterContainerWidget* ToContainer) const;
 
 	UFUNCTION(BlueprintCallable)
-	void RemoveMenu(TSubclassOf<class UCommonActivatableWidget> CommonWidget);
+	virtual void RemoveWidget(TSubclassOf<class UCommonActivatableWidget> InCommonWidget, UBetterContainerWidget* FromContainer) const;
 
 protected:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "UI")

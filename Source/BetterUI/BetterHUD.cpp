@@ -1,5 +1,6 @@
 ﻿#include "BetterHUD.h"
 
+#include "BetterMenuWidget.h"
 #include "BetterUI.h"
 
 ABetterHUD::ABetterHUD()
@@ -34,35 +35,33 @@ void ABetterHUD::ShowHUD()
 	}
 }
 
-void ABetterHUD::TogglePlayerUI(bool bShow)
+UCommonActivatableWidget* ABetterHUD::AddWidget(const TSubclassOf<class UCommonActivatableWidget> InCommonWidget,
+	UBetterContainerWidget* ToContainer) const
 {
-	// TODO
-}
+	if (!InCommonWidget || !ToContainer || !IsValid(ToContainer))
+		return nullptr;
 
-void ABetterHUD::AddMenu(const TSubclassOf<class UCommonActivatableWidget> CommonWidget)
-{
-	if (!CommonWidget || !MenusContainerWidget || !IsValid(MenusContainerWidget))
-		return;
-
-	if (MenusContainerWidget->GetWidgetFromClass(CommonWidget))
+	if (ToContainer->GetWidgetFromClass(InCommonWidget))
 	{
-		UE_LOG(LogBetterUI, Warning, TEXT("Trying to show an existing widget, removing current one..."));
-		RemoveMenu(CommonWidget);
+		UE_LOG(LogBetterUI, Warning, TEXT("Trying to show an existing widget on container %s, removing current one..."),
+			*ToContainer->GetClass()->GetName());
+		RemoveWidget(InCommonWidget, ToContainer);
 	}
 
-	MenusContainerWidget->AddWidgetFromClass(CommonWidget);
+	return ToContainer->AddWidgetFromClass(InCommonWidget);
 }
 
-void ABetterHUD::RemoveMenu(const TSubclassOf<class UCommonActivatableWidget> CommonWidget)
+void ABetterHUD::RemoveWidget(const TSubclassOf<class UCommonActivatableWidget> InCommonWidget,
+                              UBetterContainerWidget* FromContainer) const
 {
-	if (!CommonWidget || !MenusContainerWidget || !IsValid(MenusContainerWidget))
+	if (!InCommonWidget || !FromContainer || !IsValid(FromContainer))
 		return;
 
-	UCommonActivatableWidget* CurrentWidget = MenusContainerWidget->GetWidgetFromClass(CommonWidget);
+	UCommonActivatableWidget* CurrentWidget = MenusContainerWidget->GetWidgetFromClass(InCommonWidget);
 
 	if (!CurrentWidget)
 		return;
 	
-	MenusContainerWidget->RemoveWidget(CurrentWidget);
+	FromContainer->RemoveWidget(CurrentWidget);
 	CurrentWidget = nullptr;
 }

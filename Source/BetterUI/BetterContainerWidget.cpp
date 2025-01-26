@@ -78,8 +78,8 @@ void UBetterContainerWidget::RemoveCurrentWidget()
 
 bool UBetterContainerWidget::HasAnyWidgets()
 {
-	if (!IsValid(WidgetStack->GetActiveWidget()) || WidgetStack->GetActiveWidget() == nullptr || WidgetStack->
-		GetNumWidgets() < 1)
+	if (!WidgetStack || WidgetStack->GetActiveWidget() == nullptr || !IsValid(WidgetStack->GetActiveWidget()) ||
+		WidgetStack-> GetNumWidgets() < 1)
 	{
 		return false;
 	}
