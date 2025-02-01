@@ -6,7 +6,7 @@
 ABetterHUD::ABetterHUD()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	SetTickableWhenPaused(true);
+	PrimaryActorTick.bTickEvenWhenPaused = true;
 }
 
 void ABetterHUD::BeginPlay()
@@ -40,14 +40,7 @@ UCommonActivatableWidget* ABetterHUD::AddWidget(const TSubclassOf<class UCommonA
 {
 	if (!InCommonWidget || !ToContainer || !IsValid(ToContainer))
 		return nullptr;
-
-	if (ToContainer->GetWidgetFromClass(InCommonWidget))
-	{
-		UE_LOG(LogBetterUI, Warning, TEXT("Trying to show an existing widget on container %s, removing current one..."),
-			*ToContainer->GetClass()->GetName());
-		RemoveWidget(InCommonWidget, ToContainer);
-	}
-
+	
 	return ToContainer->AddWidgetFromClass(InCommonWidget);
 }
 

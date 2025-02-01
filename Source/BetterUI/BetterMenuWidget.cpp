@@ -21,14 +21,12 @@ void UBetterMenuWidget::NativeOnAddedToFocusPath(const FFocusEvent& InFocusEvent
 
 FReply UBetterMenuWidget::NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	UE_LOG(LogBetterUI, Display, TEXT("UBetterMenuWidget::NativeOnPreviewKeyDown"));
-
-	if (!GetOwningPlayer()->GetHUD()->IsA(ABetterHUD::StaticClass()))
+	if (!CurrentHUD->IsA(ABetterHUD::StaticClass()))
 		return FReply::Unhandled();
 
-	ABetterHUD* HUD = Cast<ABetterHUD>(GetOwningPlayer()->GetHUD());
+	UE_LOG(LogBetterUI, Warning, TEXT("UBetterMenuWidget::NativeOnPreviewKeyDown"));
 	
-	if (CanBeRemoved() && (InKeyEvent.GetKey() == HUD->GetGamepadBackInput() || InKeyEvent.GetKey() == HUD->GetKeyboardBackInput()))
+	if (CanBeRemoved() && (InKeyEvent.GetKey() == CurrentHUD->GetGamepadBackInput() || InKeyEvent.GetKey() == CurrentHUD->GetKeyboardBackInput()))
 	{
 		RemoveSelfFromContainer();
 	}

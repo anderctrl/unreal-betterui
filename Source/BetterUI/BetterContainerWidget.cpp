@@ -1,12 +1,32 @@
-﻿
-#include "BetterContainerWidget.h"
+﻿#include "BetterContainerWidget.h"
 
 #include "CommonUI/Public/Widgets/CommonActivatableWidgetContainer.h"
 #include "BetterHUD.h"
 #include "BetterMenuWidget.h"
 #include "BetterUI.h"
+#include "CommonButtonBase.h"
+#include "CommonInputSubsystem.h"
+#include "CommonInputTypeEnum.h"
 
-UCommonActivatableWidget* UBetterContainerWidget::AddWidgetFromClass(TSubclassOf<class UCommonActivatableWidget> WidgetToAdd)
+static UWidget* GetFocusedUMGWidget()
+{
+	const TSharedPtr<SWidget> FocusedSlateWidget = FSlateApplication::Get().GetUserFocusedWidget(0);
+	if (!FocusedSlateWidget.IsValid())
+	{
+		return nullptr;
+	}
+	for (TObjectIterator<UWidget> Itr; Itr; ++Itr)
+	{
+		if (UWidget* CandidateUMGWidget = *Itr; CandidateUMGWidget->GetCachedWidget() == FocusedSlateWidget)
+		{
+			return CandidateUMGWidget;
+		}
+	}
+	return nullptr;
+}
+
+UCommonActivatableWidget* UBetterContainerWidget::AddWidgetFromClass(
+	TSubclassOf<class UCommonActivatableWidget> WidgetToAdd)
 {
 	if (!GetOwningPlayer()->IsLocalController())
 		return nullptr;
@@ -14,14 +34,8 @@ UCommonActivatableWidget* UBetterContainerWidget::AddWidgetFromClass(TSubclassOf
 	if (!WidgetStack || !WidgetToAdd)
 		return nullptr;
 
-	for (UCommonActivatableWidget* Element : WidgetStack->GetWidgetList())
-	{
-		if (Element && Element->GetClass() == WidgetToAdd)
-		{
-			Element->ActivateWidget();
-			return Element;
-		}
-	}
+	// TODO: Find a way to access the widget that still exists to avoid duplicate added widget.
+	// GetWidgetList for some reason does not work, is EpicGames at fault?
 
 	UCommonActivatableWidget* NewWidget = WidgetStack->AddWidget(WidgetToAdd);
 	if (NewWidget)
@@ -34,13 +48,35 @@ UCommonActivatableWidget* UBetterContainerWidget::AddWidgetFromClass(TSubclassOf
 UCommonActivatableWidget* UBetterContainerWidget::GetWidgetFromClass(
 	TSubclassOf<class UCommonActivatableWidget> WidgetToFind) const
 {
-	for (const auto Element : WidgetStack->GetWidgetList())
+	if (!this)
 	{
-		if (Element->GetClass() == WidgetToFind)
+		UE_LOG(LogBetterUI, Error, TEXT("Invalid 'this' pointer!"));
+		return nullptr;
+	}
+
+	if (!WidgetToFind || !WidgetStack)
+	{
+		UE_LOG(LogBetterUI, Warning, TEXT("Invalid WidgetToFind or WidgetStack is null."));
+		return nullptr;
+	}
+
+	const auto WidgetList = WidgetStack->GetWidgetList();
+	if (WidgetList.Num() == 0)
+	{
+		UE_LOG(LogBetterUI, Warning, TEXT("WidgetStack has no widgets."));
+		return nullptr;
+	}
+
+	for (const auto Element : WidgetList)
+	{
+		if (Element && Element->GetClass()->IsChildOf(WidgetToFind))
 		{
+			UE_LOG(LogBetterUI, Log, TEXT("Widget %s found"), *Element->GetName());
 			return Element;
 		}
 	}
+
+	UE_LOG(LogBetterUI, Warning, TEXT("Widget of class %s not found."), *WidgetToFind->GetName());
 	return nullptr;
 }
 
@@ -53,10 +89,10 @@ void UBetterContainerWidget::RemoveWidget(UCommonActivatableWidget* WidgetToRemo
 	{
 		return;
 	}
-	
+
 	if (!bForceRemove && WidgetToRemove->IsA(UBetterMenuWidget::StaticClass()))
 	{
-		if (const UBetterMenuWidget* Menu = Cast<UBetterMenuWidget>(WidgetToRemove); Menu && !Menu->CanBeRemoved()) 
+		if (const UBetterMenuWidget* Menu = Cast<UBetterMenuWidget>(WidgetToRemove); Menu && !Menu->CanBeRemoved())
 			return;
 	}
 
@@ -79,7 +115,7 @@ void UBetterContainerWidget::RemoveCurrentWidget()
 bool UBetterContainerWidget::HasAnyWidgets()
 {
 	if (!WidgetStack || WidgetStack->GetActiveWidget() == nullptr || !IsValid(WidgetStack->GetActiveWidget()) ||
-		WidgetStack-> GetNumWidgets() < 1)
+		WidgetStack->GetNumWidgets() < 1)
 	{
 		return false;
 	}
@@ -106,7 +142,42 @@ void UBetterContainerWidget::NativeConstruct()
 				HandleFocus();
 			}
 		});
+
+	GetOwningLocalPlayer()->GetSubsystem<UCommonInputSubsystem>()->OnInputMethodChangedNative.AddWeakLambda(
+		this, [this](ECommonInputType CommonInputType)
+		{
+			HandleFocus();
+		});
 }
+
+void UBetterContainerWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	UWidget* CurrentFocusedWidget = GetFocusedUMGWidget();
+
+	if (CurrentFocusedWidget != nullptr && CurrentFocusedWidget != LastFocusedWidget)
+	{
+		LastFocusedWidget = CurrentFocusedWidget;
+		bPendingFocusReset = false;
+	}
+
+	if (CurrentFocusedWidget == nullptr && WidgetStack->GetNumWidgets() > 0)
+	{
+		if (!bPendingFocusReset)
+		{
+			bPendingFocusReset = true;
+			LastFocusTime = GetWorld()->GetRealTimeSeconds();
+		}
+
+		if (GetWorld()->GetRealTimeSeconds() - LastFocusTime > 0.1f)
+		{
+			HandleFocus();
+			bPendingFocusReset = false;
+		}
+	}
+}
+
 
 void UBetterContainerWidget::HandleFocus()
 {
@@ -115,12 +186,21 @@ void UBetterContainerWidget::HandleFocus()
 	{
 		return;
 	}
-
-	const UCommonActivatableWidget* ActiveWidget = WidgetStack->GetActiveWidget();
-
-	if (UWidget* FocusTarget = ActiveWidget->GetDesiredFocusTarget())
+	
+	if (!IsValid(LastFocusedWidget))
 	{
+		LastFocusedWidget = nullptr;
+	}
 
+	if (LastFocusedWidget != nullptr)
+	{
+		LastFocusedWidget->SetFocus();
+		LastFocusedWidget->SetKeyboardFocus();
+		return;
+	}
+
+	if (UWidget* FocusTarget = WidgetStack->GetActiveWidget()->GetDesiredFocusTarget())
+	{
 		FocusTarget->SetFocus();
 		FocusTarget->SetKeyboardFocus();
 	}

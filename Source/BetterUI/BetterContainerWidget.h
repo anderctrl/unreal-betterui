@@ -37,10 +37,18 @@ public:
 
 protected:
 	virtual void NativeConstruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	
 	UPROPERTY(BlueprintReadWrite, BlueprintReadWrite, meta = (BindWidget, AllowPrivateAccess=true))
 	class UCommonActivatableWidgetStack* WidgetStack;
 
 	UPROPERTY()
 	class ABetterHUD* CurrentHUD;
+
+	UPROPERTY()
+	UWidget* LastFocusedWidget;
+
+private:
+	bool bPendingFocusReset = false;
+	float LastFocusTime = 0.0f;
 };
